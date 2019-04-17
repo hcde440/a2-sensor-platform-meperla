@@ -23,19 +23,15 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define LOGO_HEIGHT   16
 #define LOGO_WIDTH    16
 
+//LED
+#define LED_PIN 13
+
 const char* ssid = "Half-G Guest";  //connecting to wifi
 const char* pass = "BeOurGuest";
 
 typedef struct { //we created a new data type definition to hold the new data
-  String bs;     //each name value pair is coming from the weather service, these create slots to hold the incoming data
-  String da;
-  String au;
-  String ca;
-  String ch;
-  String cn;
-  String gb;
-  String jp;
-  String us;
+  String bs;
+  String us;      //each name value pair is coming from the weather service, these create slots to hold the incoming data
 } Fixer;
 
 Fixer rates;//created a MetData and variable conditions"
@@ -43,8 +39,14 @@ Fixer rates;//created a MetData and variable conditions"
 // set up the 'temperature' and 'humidity' feeds
 AdafruitIO_Feed *temperature = io.feed("temperature");
 AdafruitIO_Feed *humidity = io.feed("humidity");
+// set up the 'digital' feed
+AdafruitIO_Feed *Digital = io.feed("Digital");
 
 void setup() {
+  
+  // set led pin as a digital output
+  pinMode(LED_PIN, OUTPUT);
+  
   Serial.begin(115200);
   
   // wait for serial port to open
@@ -107,7 +109,13 @@ void setup() {
   // connect to io.adafruit.com
   Serial.print("Connecting to Adafruit IO");
   io.connect();
-
+  
+  // set up a message handler for the 'digital' feed.
+  // the handleMessage function (defined below)
+  // will be called whenever a message is
+  // received from adafruit io.
+  Digital->onMessage(handleMessage);
+  
   // wait for a connection
   while(io.status() < AIO_CONNECTED) {
     Serial.print(".");
@@ -117,17 +125,13 @@ void setup() {
   // we are connected
   Serial.println();
   Serial.println(io.statusText());
+  Digital->get();
   
   getFixer();
   Serial.println();
-  Serial.println("The exchange rates for seven different countries is listed below all relative to the currency " + rates.bs + ".");
-  Serial.println("AUD: " + rates.au + ", ");
-  Serial.println("CAD: " + rates.ca + ", ");
-  Serial.println("CHF: " + rates.ch + ", ");
-  Serial.println("CNY: " + rates.cn + ", ");
-  Serial.println("GBP: " + rates.gb + ", ");
-  Serial.println("JPY: " + rates.jp + ", ");
-  Serial.println("USD: " + rates.au );
+  Serial.println("1 " + rates.bs + " Dollar =");
+  Serial.println(rates.us + " US Dollars"  );
+  Serial.println();
 
 }
 
@@ -141,9 +145,9 @@ void loop() {
   float hum = sensor.readHumidity();
   float temp = sensor.readTemperature();
   
-  Serial.print("Humidity:    ");
+  Serial.print("Humidity: ");
   Serial.print(sensor.readHumidity(), 2);
-  Serial.print("Temperature: ");
+  Serial.print("   Temperature: ");
   Serial.println(sensor.readTemperature(), 2);
   
 
@@ -171,7 +175,6 @@ void loop() {
   display.print(rates.us);
   display.print(" US Dollars");
   display.display();
-
 }
 
 
@@ -221,17 +224,27 @@ void getFixer() {
       }
 
       rates.bs = root["base"].as<String>();    //casting these values as Strings because the metData "slots" are Strings
-      rates.da = root["date"].as<String>();
-      rates.au = root["rates"]["AUD"].as<String>();
-      rates.ca = root["rates"]["CAD"].as<String>();
-      rates.ch = root["rates"]["CHF"].as<String>();
-      rates.cn = root["rates"]["CNY"].as<String>();
-      rates.gb = root["rates"]["GBP"].as<String>();
-      rates.jp = root["rates"]["JPY"].as<String>();
       rates.us = root["rates"]["USD"].as<String>();
     }
   }
   else {
     Serial.printf("Something went wrong with connecting to the endpoint in getFixer().");
   }
+}
+
+// this function is called whenever an 'digital' feed message
+// is received from Adafruit IO. it was attached to
+// the 'digital' feed in the setup() function above.
+void handleMessage(AdafruitIO_Data *data) {
+ 
+  Serial.print("received <- ");
+ 
+  if(data->toPinLevel() == HIGH)
+    Serial.println("HIGH");
+  else
+    Serial.println("LOW");
+ 
+  // write the current state to the led
+  digitalWrite(LED_PIN, data->toPinLevel());
+ 
 }
